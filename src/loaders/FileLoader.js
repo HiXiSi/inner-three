@@ -1,5 +1,6 @@
 import { Cache } from './Cache.js';
 import { Loader } from './Loader.js';
+import Singleton from '../../extends/Singleton.js';
 
 const loading = {};
 
@@ -22,7 +23,9 @@ class FileLoader extends Loader {
 
 	}
 
-	load( url, onLoad, onProgress, onError ) {
+	async load( url, onLoad, onProgress, onError ) {
+		const db = Singleton.getDB()
+		await db.open()
 
 		if ( url === undefined ) url = '';
 
@@ -46,6 +49,20 @@ class FileLoader extends Loader {
 
 			return cached;
 
+		} else {
+			const idbCache = await db.getData(url);
+			if (idbCache) {
+				this.manager.itemStart( url );
+
+				setTimeout( () => {
+
+					if ( onLoad ) onLoad( idbCache );
+
+					this.manager.itemEnd( url );
+
+				}, 0 );
+				return idbCache;
+			}
 		}
 
 		// Check if request is duplicate
@@ -220,6 +237,8 @@ class FileLoader extends Loader {
 				// Add to cache only on HTTP success, so that we do not cache
 				// error response bodies as proper responses to requests.
 				Cache.add( url, data );
+
+				db.addData(url, data);
 
 				const callbacks = loading[ url ];
 				delete loading[ url ];
